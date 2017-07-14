@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Flappy Square</title>
+	<script src="sprite_box.js" charset="utf-8"> </script>
+	<script src="GameSetup.js" charset="utf-8">	</script>
+	<script src="audioLoader.js" charset="utf-8"></script>
+  </head>
+  <body>
+	<canvas height=350 width=1300>
+		<script>
+			//Sound Control Variables
+			var sounds = new AudioLoader(30);
+				sounds.load("bgmusic_ms","audio/Music/high tech lab.flac");
+				sounds.load("jump_se","audio/SoundEffects/appear-online.ogg");
+				sounds.load("collision_se","audio/SoundEffects/click.ogg");
+			var bg_musicTimer = 0;
+				
+			setupGame(document.getElementsByTagName("Canvas")[0]);
+			var score =0;
+			var barrierDelay=0;
+			var gameOver = false;
+			
+			var square = new Sprite();
+				square.color = "red";
+				square.w = eCanvas.height*0.05;
+				square.h = eCanvas.height*0.05;
+				square.x = eCanvas.width*0.05;
+				square.y = eCanvas.height/2;
+				square.accGravityY = 5;
+				square.accNaturalLimit = 5;
+				square.jumpDelay = 0;
+			objects.push(square);
+			
+			setKeyFunction(32,'keydown',function(thi){
+				if(thi[0].jumpDelay<=0 && objects.indexOf(square)!=-1){
+					thi[0].vely = -3;
+					thi[0].jumpDelay = 0.2;
+					sounds.play("jump_se",0.5);
+				}					
+			},new Array(square));//Space Jump
+			
+			
+			
+			setLoopFunction(function(thi){thi[0].jumpDelay -= deltaTime},new Array(square));
+			setLoopFunction(function(thi){//Collision with barrier
+				
+			},new Array(square));			
+			
+			var barriersGroup = new Barriers();
+			objects.push(barriersGroup);		
+			
+			function Barriers(){
+				this.barriers = new Array();
+				this.next =0;
+				this.draw = function(ctx){
+					for(var i=0;i<this.barriers.length;i++){
+						this.barriers[i].draw(ctx);
+					}
+				}
+				this.move = function(dt){
+					for(var i=0;i<this.barriers.length;i++){
+						if(this.barriers[i].blocks[0].x>=0){
+							this.barriers[i].move(dt);
+						}else{
+							this.barriers.splice(this.barriers.indexOf(this.barriers[i]),1);
+							i--;
+						}
+					}
+				}
+				this.getNextBarrier = function(){
+					return this.barriers[0];
+				}			
+				this.getNextNextBarrier = function(){
+					return this.barriers[1];
+				}		
+				this.getBarrier = function(g){
+					return this.barriers[g];
+				}
+			}
+			
+			function Barrier(){
+				this.blocks = new Array();
+				this.passed = false;
+				this.draw = function(ctx){
+					for(var i=0;i<this.blocks.length;i++){
+						this.blocks[i].draw(ctx);
+					}
+				}
+				this.move = function(dt){
+					for(var i=0;i<this.blocks.length;i++){
+						this.blocks[i].move(dt);
+					}
+				}
+			}
+			
+			function createBarrier(){
+				var numOf = 50;
+				var hS = Math.floor(Math.random()*numOf/2);
+				var lS = numOf-hS;
+				var bar = new Barrier();
+				for(var i=0;i<hS;i++){
+					var high = new Sprite();
+						high.color = "green";
+						high.w = eCanvas.width*0.02;
+						high.h = eCanvas.height*0.032;
+						high.maskw = eCanvas.width*0.02;
+						high.maskH = eCanvas.height*0.03;
+						high.x = eCanvas.width;
+						high.y = eCanvas.height*0.03*i;
+						high.velx = -2;
+						high.hasFrictionX = false;
+						high.hasFrictionY = false;
+						high.hasFrictionAngle = false;
+					bar.blocks.push(high);
+				}		
+				for(var i=0;i<lS;i++){
+					var low = new Sprite();
+						low.color = "green";
+						low.w = eCanvas.width*0.02;
+						low.h = eCanvas.height*0.032;
+						low.maskw = eCanvas.width*0.02;
+						low.maskH = eCanvas.height*0.03;
+						low.x = eCanvas.width;
+						low.y = eCanvas.height*0.03*(i+hS+5);
+						low.velx = -2;
+						low.hasFrictionX = false;
+						low.hasFrictionY = false;
+						low.hasFrictionAngle = false;
+					bar.blocks.push(low);
+				}
+				barriersGroup.barriers.push(bar);
+			}
+			
+			setLoopFunction(function(){//Check collision with next barrier	
+				var flag = false;
+				if(barriersGroup.barriers.length>0 && objects.indexOf(square)!=-1){		
+					for(var i=0;i<barriersGroup.getNextBarrier().blocks.length;i++){
+						if(barriersGroup.getNextBarrier().blocks[i].x < square.x && !barriersGroup.getNextBarrier().passed){
+							flag = true;
+							score++;
+							barriersGroup.getNextBarrier().passed = true;
+							break;
+						}else{
+							if(square.circularColisionCheck(barriersGroup.getNextBarrier().blocks[i].x,barriersGroup.getNextBarrier().blocks[i].y)){
+								gameOver=true;
+								sounds.play("collision_se",0.5);
+								objects.splice(objects.indexOf(square),1);
+							}
+						}
+					}
+					if(flag){
+						for(var i=0;i<barriersGroup.getNextNextBarrier().blocks.length;i++){
+							if(barriersGroup.getNextNextBarrier().blocks[i].x < square.x && !barriersGroup.getNextNextBarrier().passed){
+								score++;
+								barriersGroup.getNextNextBarrier().passed = true;
+								break;
+							}else{
+								if(square.circularColisionCheck(barriersGroup.getNextNextBarrier().blocks[i].x,barriersGroup.getNextNextBarrier().blocks[i].y)){
+									gameOver=true;
+									objects.splice(objects.indexOf(square),1);
+									sounds.play("collision_se",0.5);
+								}
+							}
+						}
+					}
+				}
+			},null);
+			setLoopFunction(function(){//Check collision with roof and floor
+				if(objects.indexOf(square)!=-1){
+					if(square.y > eCanvas.offsetHeight ){
+						gameOver=true;
+						objects.splice(objects.indexOf(square),1);
+						sounds.play("collision_se",0.5);
+					}
+					if(square.y < 0 ){
+						square.y=0;
+						square.vely =0;
+					}
+				}
+			},null);
+			setLoopFunction(function(){//Creates New Barries!
+				barrierDelay -= deltaTime;
+				if(barrierDelay<=0){
+					createBarrier();
+					barrierDelay = 2;
+				}
+			},null);	
+			setLoopFunction(function(){//Indefinetly Plays the GB music
+				var dateActual = new Date();
+				if(dateActual.getTime() - bg_musicTimer > sounds.audios["bgmusic_ms"].duration*1000){
+					sounds.play("bgmusic_ms",0.1);
+					bg_musicTimer = new Date();
+				}
+			},null);
+			function HUD(){//Draws the score
+				this.draw = function (ctx){	
+					if(!gameOver){
+						ctx.font= eCanvas.width*0.033+"px Arial";
+						ctx.fillStyle = "BLACK";
+						ctx.fillText("Score: "+(score).toFixed(0),eCanvas.width*0.01,eCanvas.height*0.05);
+					}else{
+						ctx.font= eCanvas.width*0.1+"px Arial";
+						ctx.fillStyle = "BLACK";
+						ctx.fillText("Game Over",eCanvas.width*0.4,eCanvas.height*0.4);
+						ctx.fillText("Score: "+(score).toFixed(0),eCanvas.width*0.4,eCanvas.height*0.5);
+					}
+				}
+			}		
+			objects.push(new HUD());	
+			mainLoop();
+		</script>
+	</canvas>
+  </body>
+<html>
